@@ -46,7 +46,6 @@ Resources:
 
   ECSLBListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    DependsOn: ALBListener
     Properties:
       Actions:
       - Type: forward
