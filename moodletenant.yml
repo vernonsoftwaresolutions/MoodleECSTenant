@@ -1,11 +1,17 @@
 #usage:
 #aws cloudformation package --template-file cloudformation/ecs.yml --output-template-file ecs-output.yml --s3-bucket circleci.deployables
-#aws cloudformation deploy --template-file ecs-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides Version=12 ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslblistener=arn:aws:elasticloadbalancing:us-east-1:417615409974:listener/app/ECSLB/3e4551a3d5add57d/14b1315b80b22a6b ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com ecslbhostedzoneid=Z35SXDOTRQ7X7K DNSName=moodle.vssdevelopment.com HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance
+#aws cloudformation deploy --template-file ecs-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be Version=12 ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com ecslbhostedzoneid=Z35SXDOTRQ7X7K DNSName=moodle.vssdevelopment.com HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance ClientName=bradlarsen
 
 #vpc-c7aa77be
 #subnet-b61d81fe,subnet-0202dc58
 AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
+  ClientName:
+    Type: String
+    Description: Name of moodle client
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC that allows instances access to the Internet.
   Version:
     Type: String
     Description: Image version
@@ -23,9 +29,6 @@ Parameters:
   ecslbarn:
     Type: String
     Description: Elastic Load Balancer ARN
-  ecslblistener:
-    Type: String
-    Description: Elastic Load Balancer Listener
   ecscluster:
     Type: String
     Description: ECS Cluster
@@ -52,13 +55,55 @@ Resources:
     Properties:
       Actions:
       - Type: forward
-        TargetGroupArn: !Ref ecslbarn
+        TargetGroupArn: !Ref ECSTARGRP
+      Conditions:
+      - Field: host-header
+        Values: !Join ['', ["/", !Ref: DNSName]]
+      ListenerArn: !Ref ALBListener
+      Priority: !Ref: Version
+
+  ECSTARGRP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Name: !Ref: ClientName
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '20'
+      VpcId: !Ref 'VpcId'
+
+  #todo- remove this?
+  ECSLBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    DependsOn: ALBListener
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref 'ECSTARGRP'
       Conditions:
       - Field: path-pattern
         Values: [/]
-      ListenerArn: !Ref ecslblistener
+      ListenerArn: !Ref 'ALBListener'
       Priority: 1
-
+      
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    #DependsOn: ECSServiceRole      Why is this needed??
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref 'ECSTARGRP'
+      LoadBalancerArn: !Ref ecslbarn
+      Port: '80'
+      Protocol: HTTP
+            
   service:
     Type: AWS::ECS::Service
     DependsOn: 
@@ -72,7 +117,7 @@ Resources:
       LoadBalancers:
       - ContainerName: moodle
         ContainerPort: '80'
-        TargetGroupArn: !Ref ecslbarn
+        TargetGroupArn: !Ref ECSTARGRP
       Role: !Ref 'ECSServiceRole'
       TaskDefinition: !Ref 'taskdefinition'
   taskdefinition:
