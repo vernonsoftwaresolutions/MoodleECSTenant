@@ -1,0 +1,209 @@
+#usage:
+#aws cloudformation package --template-file cloudformation/ecs.yml --output-template-file ecs-output.yml --s3-bucket circleci.deployables
+#aws cloudformation deploy --template-file ecs-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides Version=12 ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslblistener=arn:aws:elasticloadbalancing:us-east-1:417615409974:listener/app/ECSLB/3e4551a3d5add57d/14b1315b80b22a6b ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com ecslbhostedzoneid=Z35SXDOTRQ7X7K DNSName=moodle.vssdevelopment.com HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance
+
+#vpc-c7aa77be
+#subnet-b61d81fe,subnet-0202dc58
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  Version:
+    Type: String
+    Description: Image version
+  DNSName:
+    Type: String
+  ecslbhostedzoneid:
+    Type: String
+    Description: Elastic Load Balancer Canonincal Hosted Zone Id
+  ecslbdnsname:
+    Type: String
+    Description: Elastic Load Balancer DNS Name
+  ecslbarn:
+    Type: String
+    Description: Elastic Load Balancer ARN
+  ecslblistener:
+    Type: String
+    Description: Elastic Load Balancer Listener
+  ecscluster:
+    Type: String
+    Description: ECS Cluster
+
+Resources:
+
+  # Record Set for moodle instance
+  MoodleDNS:
+      Type: AWS::Route53::RecordSetGroup
+      Properties:
+        HostedZoneName:
+          Ref: HostedZoneName
+        Comment: Zone apex alias targeted to Gitlab.
+        RecordSets:
+        - Name:
+            !Join [".", [ !Ref DNSName , ""]]
+          Type: A
+          AliasTarget:
+            HostedZoneId: !Ref ecslbhostedzoneid
+            DNSName: !Ref ecslbdnsname
+
+  ECSLBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    DependsOn: ALBListener
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref ecslbarn
+      Conditions:
+      - Field: path-pattern
+        Values: [/]
+      ListenerArn: !Ref ecslblistener
+      Priority: 1
+
+  service:
+    Type: AWS::ECS::Service
+    DependsOn: 
+      - MoodleDNS
+    Properties:
+      Cluster: !Ref 'ecscluster'
+      DesiredCount: '1'
+      DeploymentConfiguration: 
+        MaximumPercent: 200
+        MinimumHealthyPercent: 0
+      LoadBalancers:
+      - ContainerName: moodle
+        ContainerPort: '80'
+        TargetGroupArn: !Ref ecslbarn
+      Role: !Ref 'ECSServiceRole'
+      TaskDefinition: !Ref 'taskdefinition'
+  taskdefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Join ['', [!Ref 'AWS::StackName', -ecs-moodle]]
+      ContainerDefinitions: 
+      - 
+        Name: "moodle"
+        Image: jauer/moodle
+        Cpu: "50"
+        PortMappings: 
+          - 
+            ContainerPort: 80 # todo- use ref of something?
+            HostPort: 80 #todo- same as above
+        Memory: "500"
+        Essential: "false"  
+        Links: 
+        - "DB:DB"
+        Environment:
+        - Name: MOODLE_URL
+          Value: !Join ["", ["http://", !Ref DNSName , ""]]
+        - Name: DB_PORT_3306_TCP_ADDR
+          Value: DB
+        - Name: DB_ENV_MYSQL_DATABASE
+          Value: moodle        
+        - Name: DB_ENV_MYSQL_USER
+          Value: moodle
+        - Name: DB_ENV_MYSQL_PASSWORD
+          Value: moodle
+        - Name: DB_PORT_3306_TCP_PORT
+          Value: 3306
+      - 
+        Name: "DB"
+        Image: centurylink/mysql
+        Cpu: "50"
+        PortMappings: 
+          - 
+            ContainerPort: 3306 # todo- use ref of something?
+            HostPort: 3306 #todo- same as above
+        Memory: "500"
+        Essential: "true"  
+        Environment:
+        - Name: MYSQL_USER
+          Value: moodle
+        - Name: MYSQL_PASSWORD
+          Value: moodle
+        - Name: MYSQL_DATABASE
+          Value: moodle 
+
+  ECSServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: ecs-service
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: ['elasticloadbalancing:DeregisterInstancesFromLoadBalancer', 'elasticloadbalancing:DeregisterTargets',
+              'elasticloadbalancing:Describe*', 'elasticloadbalancing:RegisterInstancesWithLoadBalancer',
+              'elasticloadbalancing:RegisterTargets', 'ec2:Describe*', 'ec2:AuthorizeSecurityGroupIngress']
+            Resource: '*'
+  
+  ServiceScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: service
+    Properties:
+      MaxCapacity: 2
+      MinCapacity: 1
+      ResourceId: !Join ['', [service/, !Ref 'ecscluster', /, !GetAtt [service, Name]]]
+      RoleARN: !GetAtt [AutoscalingRole, Arn]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs    
+
+  ServiceScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: AStepPolicy
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref 'ServiceScalingTarget'
+      StepScalingPolicyConfiguration:
+        AdjustmentType: PercentChangeInCapacity
+        Cooldown: 60
+        MetricAggregationType: Average
+        StepAdjustments:
+        - MetricIntervalLowerBound: 0
+          ScalingAdjustment: 200
+
+  AutoscalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [application-autoscaling.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: service-autoscaling
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: ['application-autoscaling:*', 'cloudwatch:DescribeAlarms', 'cloudwatch:PutMetricAlarm',
+              'ecs:DescribeServices', 'ecs:UpdateService']
+            Resource: '*'
+
+  ALB500sAlarmScaleUp:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      EvaluationPeriods: '1'
+      Statistic: Average
+      Threshold: '10'
+      AlarmDescription: Alarm if our ALB generates too many HTTP 500s.
+      Period: '60'
+      AlarmActions: [!Ref 'ServiceScalingPolicy']
+      Namespace: AWS/ApplicationELB
+      Dimensions:
+      - Name: ECSService
+        Value: !Ref 'service'
+      ComparisonOperator: GreaterThanThreshold
+      MetricName: HTTPCode_ELB_5XX_Count
+
+  #CloudwatchLogsGroup:
+  #  Type: AWS::Logs::LogGroup
+  #  Properties:
+  #    LogGroupName: !Join ['-', [ECSLogGroup, !Ref 'AWS::StackName']]
+  #    RetentionInDays: 14
+  
