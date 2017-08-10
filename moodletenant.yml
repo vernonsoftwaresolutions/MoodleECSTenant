@@ -11,6 +11,9 @@ Parameters:
     Description: Image version
   DNSName:
     Type: String
+  HostedZoneName:
+    Type: String
+    Description:  Hosted zone name
   ecslbhostedzoneid:
     Type: String
     Description: Elastic Load Balancer Canonincal Hosted Zone Id
