@@ -39,7 +39,7 @@ Resources:
   MoodleDNS:
       Type: AWS::Route53::RecordSetGroup
       Properties:
-        HostedZoneName: !Ref: HostedZoneName
+        HostedZoneName: !Ref HostedZoneName
         Comment: Zone apex alias targeted to Gitlab.
         RecordSets:
         - Name:
@@ -57,9 +57,9 @@ Resources:
         TargetGroupArn: !Ref ECSTARGRP
       Conditions:
       - Field: host-header
-        Values: !Join ['', ["/", !Ref: DNSName]]
+        Values: !Join ['', ["/", !Ref DNSName]]
       ListenerArn: !Ref ALBListener
-      Priority: !Ref: Version
+      Priority: !Ref Version
 
   ECSTARGRP:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -69,7 +69,7 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
-      Name: !Ref: ClientName
+      Name: !Ref ClientName
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 2
