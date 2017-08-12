@@ -28,7 +28,7 @@ deployment:
       - "aws configure set default.region us-east-1"
       - "aws configure set default.output json"
       - "aws cloudformation package --template-file moodletenant.yml --output-template-file moodletenant-output.yml --s3-bucket circleci.deployables"
-      - "aws cloudformation deploy --template-file moodletenant-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be Version=$CIRCLE_BUILD_NUM ecscluster=moodle-ecs-single-ECSCluster-1JGPPQF4Z4P53 ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:loadbalancer/app/ECSLB/7b2d4c35054dd37e ecslbdnsname=ECSLB-109407601.us-east-1.elb.amazonaws.com ecslbhostedzoneid=Z35SXDOTRQ7X7K DNSName=moodle.vssdevelopment.com HostedZoneName=vssdevelopment.com.  ClientName=bradlarsen"
+      - "aws cloudformation deploy --template-file moodletenant-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be Version=$CIRCLE_BUILD_NUM ecscluster=moodle-ecs-single-ECSCluster-NT8A0OQVUWDK ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:loadbalancer/app/ECSLB/ad672c9dd6109d02 ecslbdnsname=ECSLB-175177459.us-east-1.elb.amazonaws.com ecslbhostedzoneid=Z35SXDOTRQ7X7K DNSName=moodle.vssdevelopment.com HostedZoneName=vssdevelopment.com.  ClientName=bradlarsen"
 
 
       #DockerRespository=vernonsoftwaresolutions/moodlesingleinstance
