@@ -1,6 +1,6 @@
 #usage:
 #aws cloudformation package --template-file moodletenant.yml --output-template-file moodletenant-output.yml --s3-bucket circleci.deployables
-#aws cloudformation deploy --template-file moodletenant-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be Version=12 ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com ecslbhostedzoneid=Z35SXDOTRQ7X7K DNSName=moodle.vssdevelopment.com HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance ClientName=bradlarsen
+#aws cloudformation deploy --template-file moodletenant-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be Version=12 ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com ecslbhostedzoneid=Z35SXDOTRQ7X7K HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance ClientName=bradlarsen
 
 #vpc-c7aa77be
 #subnet-b61d81fe,subnet-0202dc58
@@ -15,8 +15,6 @@ Parameters:
   Version:
     Type: String
     Description: Image version
-  DNSName:
-    Type: String
   HostedZoneName:
     Type: String
     Description:  Hosted zone name
@@ -39,11 +37,11 @@ Resources:
   MoodleDNS:
       Type: AWS::Route53::RecordSetGroup
       Properties:
-        HostedZoneName: !Ref HostedZoneName
+        HostedZoneName: !Join [".", [ !Ref HostedZoneName , ""]]
         Comment: Zone apex alias targeted to Gitlab.
         RecordSets:
         - Name:
-            !Join [".", [ !Ref DNSName , ""]]
+            !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]
           Type: A
           AliasTarget:
             HostedZoneId: !Ref ecslbhostedzoneid
@@ -57,7 +55,7 @@ Resources:
         TargetGroupArn: !Ref ECSTARGRP
       Conditions:
       - Field: host-header
-        Values: !Join ['', ["/", !Ref DNSName]]
+        Values: !Join ['', ["/",  !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]]]
       ListenerArn: !Ref ALBListener
       Priority: !Ref Version
 
@@ -138,7 +136,7 @@ Resources:
         - "DB:DB"
         Environment:
         - Name: MOODLE_URL
-          Value: !Join ["", ["http://", !Ref DNSName , ""]]
+          Value: !Join ["", ["http://",  !Join [".", [ !Ref ClientName , !Ref HostedZoneName]] , ""]]
         - Name: DB_PORT_3306_TCP_ADDR
           Value: DB
         - Name: DB_ENV_MYSQL_DATABASE
