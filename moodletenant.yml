@@ -87,7 +87,7 @@ Resources:
       - Type: forward
         TargetGroupArn: !Ref 'ECSTARGRP'
       Conditions:
-      - Field: path-pattern
+      - Field: host-header
         Values:
         - !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]
       ListenerArn: !Ref 'alblistener'
@@ -109,6 +109,7 @@ Resources:
         TargetGroupArn: !Ref ECSTARGRP
       Role: !Ref 'ECSServiceRole'
       TaskDefinition: !Ref 'taskdefinition'
+
   taskdefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
