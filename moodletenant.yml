@@ -50,18 +50,19 @@ Resources:
             HostedZoneId: !Ref ecslbhostedzoneid
             DNSName: !Ref ecslbdnsname
 
+  #todo- remove this?
   ECSLBListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
       Actions:
       - Type: forward
-        TargetGroupArn: !Ref ECSTARGRP
+        TargetGroupArn: !Ref 'ECSTARGRP'
       Conditions:
       - Field: host-header
-        Values: !Join ['', ["/",  !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]]]
-      ListenerArn: !Ref alblistener
+        Values:
+        - !Join ['', ["/",  !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]]]
+      ListenerArn: !Ref 'alblistener'
       Priority: !Ref Priority
-
   ECSTARGRP:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
