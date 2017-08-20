@@ -1,6 +1,6 @@
 #usage:
 #aws cloudformation package --template-file moodletenant.yml --output-template-file moodletenant-output.yml --s3-bucket circleci.deployables
-#aws cloudformation deploy --template-file moodletenant-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be Version=12 ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com alblistener=value ecslbhostedzoneid=Z35SXDOTRQ7X7K HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance ClientName=bradlarsen
+#aws cloudformation deploy --template-file moodletenant-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com alblistener=value ecslbhostedzoneid=Z35SXDOTRQ7X7K HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance ClientName=bradlarsen
 
 #vpc-c7aa77be
 #subnet-b61d81fe,subnet-0202dc58
@@ -12,9 +12,9 @@ Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: Select a VPC that allows instances access to the Internet.
-  Version:
-    Type: String
-    Description: Image version
+  Priority:
+    Type: Number 
+    Description: ALB rule priority number
   HostedZoneName:
     Type: String
     Description:  Hosted zone name
@@ -60,7 +60,7 @@ Resources:
       - Field: host-header
         Values: !Join ['', ["/",  !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]]]
       ListenerArn: !Ref alblistener
-      Priority: !Ref Version
+      Priority: !Ref Priority
 
   ECSTARGRP:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -78,20 +78,6 @@ Resources:
       - Key: deregistration_delay.timeout_seconds
         Value: '20'
       VpcId: !Ref 'VpcId'
-
-  #todo- remove this?
-  ECSLBListenerRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Properties:
-      Actions:
-      - Type: forward
-        TargetGroupArn: !Ref 'ECSTARGRP'
-      Conditions:
-      - Field: host-header
-        Values:
-        - !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]
-      ListenerArn: !Ref 'alblistener'
-      Priority: 1
             
   service:
     Type: AWS::ECS::Service
