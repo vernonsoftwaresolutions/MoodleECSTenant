@@ -1,6 +1,6 @@
 #usage:
 #aws cloudformation package --template-file moodletenant.yml --output-template-file moodletenant-output.yml --s3-bucket circleci.deployables
-#aws cloudformation deploy --template-file moodletenant-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be Version=12 ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com ecslbhostedzoneid=Z35SXDOTRQ7X7K HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance ClientName=bradlarsen
+#aws cloudformation deploy --template-file moodletenant-output.yml --capabilities CAPABILITY_IAM --stack-name moodle-ecs-single --parameter-overrides VpcId=vpc-c7aa77be Version=12 ecscluster=moodle-ecs-single-ECSCluster-1GO8PSGOCUMFY ecslbarn=arn:aws:elasticloadbalancing:us-east-1:417615409974:targetgroup/ECSTARGRP/08e87065c62e095a ecslbdnsname=ECSLB-931880790.us-east-1.elb.amazonaws.com alblistener=value ecslbhostedzoneid=Z35SXDOTRQ7X7K HostedZoneName=vssdevelopment.com. DockerRespository=vernonsoftwaresolutions/moodlesingleinstance ClientName=bradlarsen
 
 #vpc-c7aa77be
 #subnet-b61d81fe,subnet-0202dc58
@@ -30,6 +30,9 @@ Parameters:
   ecscluster:
     Type: String
     Description: ECS Cluster
+  alblistener:
+    Type: String 
+    Description: ALB listener arn
 
 Resources:
 
@@ -56,7 +59,7 @@ Resources:
       Conditions:
       - Field: host-header
         Values: !Join ['', ["/",  !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]]]
-      ListenerArn: !Ref ALBListener
+      ListenerArn: !Ref alblistener
       Priority: !Ref Version
 
   ECSTARGRP:
@@ -79,27 +82,16 @@ Resources:
   #todo- remove this?
   ECSLBListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    DependsOn: ALBListener
     Properties:
       Actions:
       - Type: forward
         TargetGroupArn: !Ref 'ECSTARGRP'
       Conditions:
       - Field: path-pattern
-        Values: [/]
-      ListenerArn: !Ref 'ALBListener'
+        Values:
+        - !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]
+      ListenerArn: !Ref 'alblistener'
       Priority: 1
-      
-  ALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    #DependsOn: ECSServiceRole      Why is this needed??
-    Properties:
-      DefaultActions:
-      - Type: forward
-        TargetGroupArn: !Ref 'ECSTARGRP'
-      LoadBalancerArn: !Ref ecslbarn
-      Port: '80'
-      Protocol: HTTP
             
   service:
     Type: AWS::ECS::Service
@@ -129,7 +121,6 @@ Resources:
         PortMappings: 
           - 
             ContainerPort: 80 # todo- use ref of something?
-            HostPort: 80 #todo- same as above
         Memory: "500"
         Essential: "false"  
         Links: 
