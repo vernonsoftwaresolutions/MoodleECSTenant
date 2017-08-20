@@ -133,7 +133,6 @@ Resources:
         PortMappings: 
           - 
             ContainerPort: 3306 # todo- use ref of something?
-            HostPort: 3306 #todo- same as above
         Memory: "500"
         Essential: "true"  
         Environment:
