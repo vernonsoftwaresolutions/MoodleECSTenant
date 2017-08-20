@@ -60,7 +60,7 @@ Resources:
       Conditions:
       - Field: host-header
         Values:
-        - !Join ['', ["/",  !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]]]
+        - !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]
       ListenerArn: !Ref 'alblistener'
       Priority: !Ref Priority
   ECSTARGRP:
