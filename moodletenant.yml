@@ -231,4 +231,5 @@ Resources:
 Outputs:
   TenantUrl:
     Value: !Join [".", [ !Ref ClientName , !Ref HostedZoneName]]
-    Name: TenantUrl
+    Export:
+      Name: TenantUrl
