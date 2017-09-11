@@ -22,5 +22,5 @@ deployment:
     branch: master
     commands: 
     ## run deploy
-    - sh ./deploy
+    - sh ./deploy.sh
     - sh ./cleanup.sh
